@@ -1,0 +1,56 @@
+name: magicstream-prod
+
+services:
+  db:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongodb-data:/data/db
+      - ./seed.js:/docker-entrypoint-initdb.d/seed.js:ro
+      - ./seed-data:/seed-data:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    image: 20071386/magic-stream-api:1.0.0
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://db:27017
+      DATABASE_NAME: magic-stream-movies
+      SECRET_KEY: ${PROD_SECRET_KEY:?Set PROD_SECRET_KEY in .env.prod}
+      SECRET_REFRESH_KEY: ${PROD_SECRET_REFRESH_KEY:?Set PROD_SECRET_REFRESH_KEY in .env.prod}
+      ALLOWED_ORIGINS: ${PROD_ALLOWED_ORIGINS:?Set PROD_ALLOWED_ORIGINS in .env.prod}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      BASE_PROMPT_TEMPLATE: ${BASE_PROMPT_TEMPLATE:-}
+      RECOMMENDED_MOVIE_LIMIT: ${RECOMMENDED_MOVIE_LIMIT:-5}
+      GIN_MODE: release
+    ports:
+      - "${PROD_API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/hello || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  client:
+    image: 20071386/magic-stream-client:1.0.0
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "${PROD_CLIENT_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mongodb-data:
+    name: magicstream-prod-mongodb-data

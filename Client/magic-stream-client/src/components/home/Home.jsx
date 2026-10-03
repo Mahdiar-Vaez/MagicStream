@@ -31,6 +31,7 @@ const Home =({updateMovieReview}) => {
 
     return (
         <>
+        <h3>hi hellosdfsdf فثسفشسعخبشس </h3>
             {loading ? (
                 <Spinner/>
             ):  (

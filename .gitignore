@@ -19,6 +19,7 @@ Server/MagicStreamServer/bin/
 Client/magic-stream-client/.env
 Server/MagicStreamServer/.env
 .env
+.env.prod
 *.env
 
 

@@ -1,0 +1,88 @@
+name: magicstream-dev
+
+services:
+  db:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongodb-data:/data/db
+      - ./seed.js:/docker-entrypoint-initdb.d/seed.js:ro
+      - ./seed-data:/seed-data:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: ./Server/MagicStreamServer
+      dockerfile: Dockerfile.dev
+    develop:
+      watch:
+        - action: rebuild
+          path: ./Server/MagicStreamServer/Dockerfile.dev
+        - action: rebuild
+          path: ./Server/MagicStreamServer/go.mod
+        - action: rebuild
+          path: ./Server/MagicStreamServer/go.sum
+        - action: sync
+          path: ./Server/MagicStreamServer
+          target: /app
+          ignore:
+            - tmp/
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://db:27017
+      DATABASE_NAME: magic-stream-movies
+      SECRET_KEY: ${SECRET_KEY:-magicstream-local-dev-secret-key}
+      SECRET_REFRESH_KEY: ${SECRET_REFRESH_KEY:-magicstream-local-dev-refresh-secret-key}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      BASE_PROMPT_TEMPLATE: ${BASE_PROMPT_TEMPLATE:-}
+      RECOMMENDED_MOVIE_LIMIT: ${RECOMMENDED_MOVIE_LIMIT:-5}
+      GIN_MODE: debug
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/hello || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  client:
+    build:
+      context: ./Client/magic-stream-client
+      dockerfile: Dockerfile.dev
+    develop:
+      watch:
+        - action: rebuild
+          path: ./Client/magic-stream-client/Dockerfile.dev
+        - action: rebuild
+          path: ./Client/magic-stream-client/package.json
+        - action: rebuild
+          path: ./Client/magic-stream-client/package-lock.json
+        - action: sync
+          path: ./Client/magic-stream-client
+          target: /app
+          ignore:
+            - node_modules/
+            - dist/
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+      DOCKER_WATCH_POLLING: "true"
+    ports:
+      - "${CLIENT_PORT:-5173}:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mongodb-data:
+    name: magicstream-dev-mongodb-data
