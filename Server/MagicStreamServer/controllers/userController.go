@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/GavinLonDigital/MagicStream/Server/MagicStreamServer/database"
@@ -15,6 +17,13 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func getCookieConfig() (secure bool, sameSite http.SameSite) {
+	if strings.ToLower(os.Getenv("COOKIE_SECURE")) == "true" {
+		return true, http.SameSiteNoneMode
+	}
+	return false, http.SameSiteLaxMode
+}
 
 func HashPassword(password string) (string, error) {
 	HashPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -121,25 +130,24 @@ func LoginUser(client *mongo.Client) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update tokens"})
 			return
 		}
+		secure, sameSite := getCookieConfig()
 		http.SetCookie(c.Writer, &http.Cookie{
-			Name:  "access_token",
-			Value: token,
-			Path:  "/",
-			// Domain:   "localhost",
+			Name:     "access_token",
+			Value:    token,
+			Path:     "/",
 			MaxAge:   86400,
-			Secure:   true,
+			Secure:   secure,
 			HttpOnly: true,
-			SameSite: http.SameSiteNoneMode,
+			SameSite: sameSite,
 		})
 		http.SetCookie(c.Writer, &http.Cookie{
-			Name:  "refresh_token",
-			Value: refreshToken,
-			Path:  "/",
-			// Domain:   "localhost",
+			Name:     "refresh_token",
+			Value:    refreshToken,
+			Path:     "/",
 			MaxAge:   604800,
-			Secure:   true,
+			Secure:   secure,
 			HttpOnly: true,
-			SameSite: http.SameSiteNoneMode,
+			SameSite: sameSite,
 		})
 
 		c.JSON(http.StatusOK, models.UserResponse{
@@ -188,35 +196,25 @@ func LogoutHandler(client *mongo.Client) gin.HandlerFunc {
 		// 	true,        // Use true in production with HTTPS
 		// 	true,        // HttpOnly
 		// )
+		secure, sameSite := getCookieConfig()
 		http.SetCookie(c.Writer, &http.Cookie{
-			Name:  "access_token",
-			Value: "",
-			Path:  "/",
-			// Domain:   "localhost",
+			Name:     "access_token",
+			Value:    "",
+			Path:     "/",
 			MaxAge:   -1,
-			Secure:   true,
+			Secure:   secure,
 			HttpOnly: true,
-			SameSite: http.SameSiteNoneMode,
+			SameSite: sameSite,
 		})
 
-		// // Clear the refresh_token cookie
-		// c.SetCookie(
-		// 	"refresh_token",
-		// 	"",
-		// 	-1,
-		// 	"/",
-		// 	"localhost",
-		// 	true,
-		// 	true,
-		// )
 		http.SetCookie(c.Writer, &http.Cookie{
 			Name:     "refresh_token",
 			Value:    "",
 			Path:     "/",
 			MaxAge:   -1,
-			Secure:   true,
+			Secure:   secure,
 			HttpOnly: true,
-			SameSite: http.SameSiteNoneMode,
+			SameSite: sameSite,
 		})
 
 		c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
@@ -260,8 +258,25 @@ func RefreshTokenHandler(client *mongo.Client) gin.HandlerFunc {
 			return
 		}
 
-		c.SetCookie("access_token", newToken, 86400, "/", "localhost", true, true)          // expires in 24 hours
-		c.SetCookie("refresh_token", newRefreshToken, 604800, "/", "localhost", true, true) //expires in 1 week
+		secure, sameSite := getCookieConfig()
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name:     "access_token",
+			Value:    newToken,
+			Path:     "/",
+			MaxAge:   86400,
+			Secure:   secure,
+			HttpOnly: true,
+			SameSite: sameSite,
+		})
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name:     "refresh_token",
+			Value:    newRefreshToken,
+			Path:     "/",
+			MaxAge:   604800,
+			Secure:   secure,
+			HttpOnly: true,
+			SameSite: sameSite,
+		})
 
 		c.JSON(http.StatusOK, gin.H{"message": "Tokens refreshed"})
 	}

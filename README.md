@@ -8,395 +8,279 @@
 
 - [درباره پروژه](#درباره-پروژه)
 - [تکنولوژی‌ها](#تکنولوژیها)
-- [ساختار پروژه](#ساختار-پروژه)
+- [معماری دیپلوی بدون تداخل (پورت سفارشی)](#معماری-دیپلوی-بدون-تداخل-پورت-سفارشی)
 - [پیش‌نیازها](#پیشنیازها)
 - [محیط توسعه (Dev)](#محیط-توسعه-dev)
-- [استقرار پروداکشن (Prod)](#استقرار-پروداکشن-prod)
-  - [معماری سرور](#معماری-سرور)
-  - [راهنمای گام‌به‌گام برای سرور](#راهنمای-گامبهگام-برای-سرور)
-  - [راهنمای .env.prod](#راهنمای-envprod)
-- [نکته مهم: VITE_API_BASE_URL](#نکته-مهم-vite_api_base_url)
-- [مدیریت تگ‌های Docker Hub](#مدیریت-تگهای-docker-hub)
-- [نکات امنیتی](#نکات-امنیتی)
-- [رفع اشکال](#رفع-اشکال)
+- [راهنمای جامع استقرار پروداکشن (تست روی سرور)](#راهنمای-جامع-استقرار-پروداکشن-تست-روی-سرور)
+  - [۱. اتصال به سرور و نصب داکر](#۱-اتصال-به-سرور-و-نصب-داکر)
+  - [۲. انتقال فایل‌های مورد نیاز به سرور](#۲-انتقال-فایلهای-مورد-نیاز-به-سرور)
+  - [۳. ساخت و تنظیم فایل .env.prod](#۳-ساخت-و-تنظیم-فایل-envprod)
+  - [۴. اجرای کانتینرها با داکر کامپوز](#۴-اجرای-کانتینرها-با-داکر-کامپوز)
+  - [۵. بررسی سلامت و تست سرویس‌ها](#۵-بررسی-سلامت-و-تست-سرویسها)
+- [توضیحات متغیرهای .env.prod و چرایی تنظیمات](#توضیحات-متغیرهای-envprod-و-چرایی-تنظیمات)
+- [رفع کامل باگ‌ها و تضمین اجرای بی‌نقص](#رفع-کامل-باگها-و-تضمین-اجرای-بینقص)
+  - [حل مشکل کوکی‌های احراز هویت (Login و Refresh Token)](#حل-مشکل-کوکkey-احراز-هویت-login-و-refresh-token)
+  - [حل مشکل تداخل پورت با سایت‌های موجود روی سرور](#حل-مشکل-تداخل-پورت-با-سایتهای-موجود-روی-سرور)
+  - [حل مشکل آدرس‌دهی و عدم نیاز به ری‌بیلد کلاینت](#حل-مشکل-آدرسدهی-و-عدم-نیاز-به-ریبیلد-کلاینت)
+- [دستورات عیب‌یابی و مدیریت](#دستورات-عیبیابی-و-مدیریت)
 - [لینک ویدیوی آموزشی](#لینک-ویدیوی-آموزشی)
 
 ---
 
 ## درباره پروژه
 
-این پروژه یک شبیه‌سازی کامل از یک پلتفرم مدرن استریم فیلم است که نشان می‌دهد چطور می‌توان تکنولوژی‌های مختلف را برای ساختن یک اپلیکیشن مقیاس‌پذیر و هوشمند کنار هم گذاشت.
-
-- **فرانت‌اند React** — تجربه کاربری مدرن با React-Player
-- **بک‌اند Go (gin-gonic)** — API با عملکرد بالا
-- **موتور پیشنهاد هوش مصنوعی** — با LangChainGo و OpenAI
-- **پایگاه داده MongoDB** — ذخیره‌سازی متادیتای فیلم‌ها و کاربران
+این پروژه یک سیستم کامل استریم فیلم است که شامل بخش‌های زیر می‌باشد:
+- **فرانت‌اند React**: رابط کاربری تعاملی برای نمایش فیلم‌ها، ژانرها و پخش تریلر با React-Player.
+- **بک‌اند Go (gin-gonic)**: وب‌سرویس سریع با معماری تمیز و احراز هویت مبتنی بر JWT در کوکی‌های HttpOnly.
+- **سیستم هوش مصنوعی**: پیشنهاد فیلم مبتنی بر سلیقه و ژانرهای مورد علاقه کاربر با LangChainGo و OpenAI.
+- **دیتابیس MongoDB**: نگهداری فیلم‌ها، ژانرها، رنکینگ‌ها و کاربران با مقداردهی اولیه خودکار (Seeding).
 
 ---
 
 ## تکنولوژی‌ها
 
-| لایه | تکنولوژی |
+| بخش | تکنولوژی |
 |------|-----------|
-| Frontend / Client | JavaScript / React / Vite |
-| Backend / Server | Go / gin-gonic |
-| Storage / Database | MongoDB 7 |
-| Container | Docker / Docker Compose |
-| Web Server (Prod) | Nginx (Alpine) |
+| فرانت‌اند | React 19, Vite, React-Bootstrap, React-Player |
+| بک‌اند | Go 1.24, Gin Framework, Gin CORS |
+| پایگاه داده | MongoDB 7 |
+| وب‌سرور فرانت‌اند و Reverse Proxy | Nginx Alpine |
+| کانتینرسازی | Docker, Docker Compose |
 
 ---
 
-## ساختار پروژه
+## معماری دیپلوی بدون تداخل (پورت سفارشی)
+
+از آنجا که پورت‌های `80` و `443` سرور متعلق به دامنه و سایت دیگری هستند، این پروژه طوری معماری شده است که:
+1. **فرانت‌اند و ریورس‌پروکسی Nginx** روی یک پورت اختصاصی آزاد (مثلاً `3000`) بالا می‌آید.
+2. تمام درخواست‌های وب و API کاربر از طریق همین پورت انجام می‌شود:
+   - درخواست صفحات وب: `http://parva-ai.ir:3000/`
+   - درخواست‌های API: `http://parva-ai.ir:3000/api/...`
+3. نیازی به باز کردن پورت جداگانه برای API نیست؛ کانتینر Nginx درخواست‌های `/api/` را مستقیماً در شبکه داخلی داکر به بک‌اند Go تحویل می‌دهد.
+4. **کوکی‌های احراز هویت (Same-Origin)** بدون هیچ‌گونه بلاک شدن توسط مرورگر در پروتکل HTTP ثبت می‌شوند.
 
 ```
-MagicStream/
-├── Client/
-│   └── magic-stream-client/     # React + Vite SPA
-│       ├── Dockerfile.dev
-│       ├── Dockerfile.prod       # Multi-stage: Node build + Nginx serve
-│       └── nginx.prod.conf       # Nginx با SPA routing و cache headers
-├── Server/
-│   └── MagicStreamServer/        # Go API (gin-gonic)
-│       ├── Dockerfile.dev        # Hot-reload با Air
-│       └── Dockerfile.prod       # Multi-stage: Alpine build + minimal runtime
-├── seed-data/                    # داده‌های اولیه MongoDB (JSON)
-├── seed.js                       # اسکریپت seed (فقط یک‌بار اجرا می‌شود)
-├── docker-compose.dev.yaml       # محیط توسعه با Watch
-├── docker-compose.prod.yaml      # محیط پروداکشن از Docker Hub
-├── .env                          # متغیرهای توسعه (در Git ignore است)
-├── .env.prod.example             # نمونه .env.prod — این را کپی کن
-└── .gitignore
+کاربر (مرورگر)
+    │
+    ▼  http://parva-ai.ir:3000  (یا http://156.241.0.153:3000)
+┌─────────────────────────────────────────────────────────────┐
+│                      کانتینر Client (Nginx)                │
+│                                                             │
+│    مسیرهای وب / ───────────────► فایل‌های React (SPA)        │
+│    مسیرهای /api/ ──────────────► پراکسی به بک‌اند Go       │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ (شبکه داخلی داکر)
+                           ▼
+┌──────────────────────────────────────┐     ┌──────────────────────┐
+│          کانتینر API (Go)            │────►│ کانتینر دیتابیس Mongo │
+│  (پورت داخلی 8080)                  │     │   (پورت داخلی 27017) │
+└──────────────────────────────────────┘     └──────────────────────┘
 ```
 
 ---
 
 ## پیش‌نیازها
 
-| ابزار | نسخه توصیه‌شده |
-|-------|----------------|
-| Docker | 26+ |
-| Docker Compose | 2.22+ (برای Watch در dev) |
-| Git | هر نسخه |
-
-> **توجه:** برای پروداکشن فقط Docker و Docker Compose لازم است — نه Go، نه Node.
+روی سرور تنها موارد زیر مورد نیاز است (هیچ نیازی به نصب Go یا Nodejs نیست):
+- **Docker Engine** نسخه 24 به بالا
+- **Docker Compose** نسخه 2 به بالا
 
 ---
 
 ## محیط توسعه (Dev)
 
-### راه‌اندازی سریع
+برای اجرا روی سیستم لوکال با قابلیت Hot-Reload:
 
 ```bash
-# کلون کن
-git clone https://github.com/Mahdiar-Vaez/MagicStream.git
-cd MagicStream
-
-# اجرا با Hot-Reload (Docker Compose Watch)
 docker compose --env-file .env -f docker-compose.dev.yaml up --build --watch
 ```
 
-| سرویس | آدرس |
-|--------|-------|
-| Client (React/Vite) | http://localhost:5173 |
-| API (Go/gin) | http://localhost:8080 |
-
-### نحوه کار Watch در Dev
-
-- تغییرات **React** → sync به کانتینر Vite → HMR در مرورگر
-- تغییرات **Go** → sync به کانتینر API → Air برنامه را ری‌بیلد می‌کند
-- تغییر **Dockerfile یا go.mod/package.json** → کانتینر ری‌بیلد می‌شود
+- فرانت‌اند: `http://localhost:5173`
+- بک‌اند: `http://localhost:8080`
 
 ---
 
-## استقرار پروداکشن (Prod)
+## راهنمای جامع استقرار پروداکشن (تست روی سرور)
 
-### معماری سرور
+### ۱. اتصال به سرور و نصب داکر
 
-```
-اینترنت
-   │
-   ├─── http://parva-ai.ir  (پورت 80)  ──► کانتینر client (Nginx)
-   │
-   └─── http://parva-ai.ir:8080        ──► کانتینر api (Go/gin)
-                                              │
-                                              └──► کانتینر db (MongoDB)
-                                                   [فقط داخل Docker network]
-```
-
-> Docker images روی Docker Hub:
-> - `20071386/magic-stream-api:1.0.0`
-> - `20071386/magic-stream-client:1.0.0` ← build شده با `VITE_API_BASE_URL=http://parva-ai.ir:8080`
-
----
-
-### راهنمای گام‌به‌گام برای سرور
-
-#### ۱. اتصال به سرور و نصب Docker
-
+وارد سرور شو:
 ```bash
-# اتصال SSH
 ssh root@156.241.0.153
+```
 
-# نصب Docker (Ubuntu/Debian)
+در صورت نیاز به نصب داکر (روی اوبونتو/دبیان):
+```bash
 curl -fsSL https://get.docker.com | sh
-
-# اگر کاربر غیر root داری
-sudo usermod -aG docker $USER
-newgrp docker
-
-# تست
-docker --version
-docker compose version
 ```
 
-#### ۲. ایجاد پوشه پروژه روی سرور
+### ۲. انتقال فایل‌های مورد نیاز به سرور
 
+تنها ۴ مورد روی سرور نیاز است (چون ایمیج‌ها از داکر هاب دانلود می‌شوند):
+1. `docker-compose.prod.yaml`
+2. `.env.prod.example`
+3. `seed.js`
+4. پوشه `seed-data/`
+
+#### روش پیشنهادی (کلون مخزن روی سرور):
 ```bash
-mkdir -p ~/magicstream
-cd ~/magicstream
+mkdir -p ~/magicstream && cd ~/magicstream
+git clone https://github.com/Mahdiar-Vaez/MagicStream.git .
 ```
 
-#### ۳. کپی فایل‌های لازم به سرور
-
-فقط این ۴ چیز روی سرور لازم است — کد سورس نه، ایمیج‌ها از Docker Hub pull می‌شوند:
-
-**روش اول — با scp (از local):**
+یا انتقال از سیستم لوکال با `scp`:
 ```bash
-scp docker-compose.prod.yaml root@156.241.0.153:~/magicstream/
-scp .env.prod.example root@156.241.0.153:~/magicstream/
-scp seed.js root@156.241.0.153:~/magicstream/
+scp docker-compose.prod.yaml .env.prod.example seed.js root@156.241.0.153:~/magicstream/
 scp -r seed-data root@156.241.0.153:~/magicstream/
 ```
 
-**روش دوم — با git clone (روی سرور):**
-```bash
-# روی سرور
-git clone https://github.com/Mahdiar-Vaez/MagicStream.git .
-# فقط فایل‌های لازم کپی شدند — seed-data هم هست
-```
+---
 
-#### ۴. ساختن فایل .env.prod روی سرور
+### ۳. ساخت و تنظیم فایل .env.prod
 
+روی سرور:
 ```bash
 cd ~/magicstream
 cp .env.prod.example .env.prod
 nano .env.prod
 ```
 
-محتوای `.env.prod` را این‌طور پر کن (فقط secret‌ها را تغییر بده):
-
+نمونه مقادیر آماده برای تست:
 ```ini
-PROD_CLIENT_PORT=80
+# پورت فرانت‌اند (پورت ۸۰ برای سایت دیگر شماست، بنابراین ۳۰۰۰ قرار می‌دهیم)
+PROD_CLIENT_PORT=3000
+
+# پورت مستقیم API (اختیاری)
 PROD_API_PORT=8080
-PROD_ALLOWED_ORIGINS=http://parva-ai.ir
-PROD_SECRET_KEY=اینجا-یک-کلید-بلند-تصادفی-بگذار
-PROD_SECRET_REFRESH_KEY=اینجا-یک-کلید-بلند-تصادفی-دیگر-بگذار
+
+# مبدأ مجاز CORS (علامت * برای پذیرش هر دو آدرس دامنه و IP)
+PROD_ALLOWED_ORIGINS=*
+
+# امنیت کوکی در محیط تست HTTP باید حتماً false باشد
+COOKIE_SECURE=false
+
+# دو کلید امنیتی مجزا و بلند
+PROD_SECRET_KEY=94e75c6bf23d8c11e73a0e41fbead486e963bc1574a2f81944da2b7a9f62cd81
+PROD_SECRET_REFRESH_KEY=c39174af0b719dc18320184ebaa96317bc2d4188ae4301556a31cfa0e8b91273
+
+# اختیاری
 OPENAI_API_KEY=
 BASE_PROMPT_TEMPLATE=
 RECOMMENDED_MOVIE_LIMIT=5
 ```
 
-> **تولید secret key امن روی سرور:**
-> ```bash
-> openssl rand -hex 32
-> # دو بار اجرا کن — یکی برای SECRET_KEY، یکی برای SECRET_REFRESH_KEY
-> ```
+> **نکته کلیدها:** برای تولید کلید تصادفی در ترمینال لینوکس دستور `openssl rand -hex 32` را اجرا کنید.
 
-#### ۵. اجرای پروداکشن
+---
+
+### ۴. اجرای کانتینرها با داکر کامپوز
+
+ایمیج‌های به‌روزشده را از داکر هاب دریافت و اجرا کنید:
 
 ```bash
-# pull ایمیج‌ها از Docker Hub
+# دانلود آخرین نسخه ایمیج‌ها
 docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
 
-# اجرا در background
+# راه‌اندازی کانتینرها در پس‌زمینه
 docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d --remove-orphans
 ```
 
-#### ۶. بررسی وضعیت
+---
 
+### ۵. بررسی سلامت و تست سرویس‌ها
+
+بررسی وضعیت کانتینرها:
 ```bash
-# وضعیت کانتینرها (همه باید Up باشند)
 docker compose --env-file .env.prod -f docker-compose.prod.yaml ps
+```
+خروجی باید نشان دهد که تمام کانتینرها (`db`, `api`, `client`) در وضعیت `Up (healthy)` هستند.
 
-# لاگ‌ها
+بررسی لاگ‌های اجرا و سید اولیه دیتابیس:
+```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yaml logs -f
+```
 
-# تست API
+تست پاسخگویی API:
+```bash
 curl http://localhost:8080/hello
-
-# تست از بیرون
-curl http://parva-ai.ir:8080/hello
-curl http://parva-ai.ir
+# خروجی: Hello, MagicStreamMovies!
 ```
+
+اکنون از مرورگر به آدرس‌های زیر دسترسی دارید:
+- **از طریق دامنه:** `http://parva-ai.ir:3000`
+- **از طریق آی‌پی:** `http://156.241.0.153:3000`
 
 ---
 
-### راهنمای .env.prod
+## توضیحات متغیرهای .env.prod و چرایی تنظیمات
 
-#### جدول متغیرها
-
-| متغیر | مقدار برای این سرور | توضیح |
-|--------|---------------------|-------|
-| `PROD_CLIENT_PORT` | `80` | پورت host برای کلاینت |
-| `PROD_API_PORT` | `8080` | پورت host برای API |
-| `PROD_ALLOWED_ORIGINS` | `http://parva-ai.ir` | CORS origin — دقیق همین |
-| `PROD_SECRET_KEY` | **باید تغییر کنی** | کلید JWT — حداقل ۳۲ کاراکتر |
-| `PROD_SECRET_REFRESH_KEY` | **باید تغییر کنی** | کلید JWT refresh — متفاوت از بالا |
-| `OPENAI_API_KEY` | اختیاری | اگر نداری خالی بگذار |
-| `BASE_PROMPT_TEMPLATE` | اختیاری | قالب سفارشی prompt |
-| `RECOMMENDED_MOVIE_LIMIT` | `5` | تعداد پیشنهاد AI |
-
-#### ❌ این متغیر در .env.prod نیست و تأثیری ندارد
-
-| متغیر | چرا اینجا نیست |
-|--------|----------------|
-| `VITE_API_BASE_URL` | Build-time است — داخل JS کامپایل شده. روی سرور قابل تغییر نیست |
-
-#### جدول خطاهای رایج
-
-| مشکل | علت احتمالی | راه‌حل |
-|-------|-------------|---------|
-| API کار نمی‌کند | `PROD_SECRET_KEY` کوتاه یا خالی | مقدار قوی وارد کن |
-| CORS error در مرورگر | `PROD_ALLOWED_ORIGINS` اشتباه | دقیقاً `http://parva-ai.ir` باشد |
-| کلاینت به API وصل نمی‌شود | ایمیج قدیمی با `localhost:8080` | ایمیج جدید از Docker Hub pull کن |
-| صفحه سفید / 404 | Nginx SPA routing مشکل | لاگ کانتینر client را چک کن |
-| seed اجرا نمی‌شود | Volume از قبل وجود دارد | این طبیعی است — seed فقط اول بار |
+| متغیر | مقدار پیشنهادی | دلیل و توضیح فنی |
+|--------|----------------|------------------|
+| `PROD_CLIENT_PORT` | `3000` | پورت ۸۰ متعلق به سایت اصلی شماست. انتخاب پورت ۳۰۰۰ مانع هرگونه تداخل پورت با سیستم وب سرور اصلی هاست می‌شود. |
+| `PROD_API_PORT` | `8080` | پورت کانتینر Go. از بیرون نیز در صورت نیاز برای تست‌های مستقیم یا Postman در دسترس است. |
+| `PROD_ALLOWED_ORIGINS` | `*` | به بک‌اند اجازه می‌دهد برای هر دو آدرس دامنه و IP سرور با اعتبارنامه (Credentials) کوکی‌ها را رد و بدل کند. |
+| `COOKIE_SECURE` | `false` | **فوق‌العاده حیاتی:** در تست پروداکشن که با پروتکل `http://` صورت می‌گیرد، اگر فلگ `Secure: true` باشد، مرورگرهای مدرن (کروم و فایرفاکس) کوکی را ذخیره نکرده و لاگین بلافاصله می‌پرد. این متغیر اجازه می‌دهد در حالت HTTP کوکی‌ها معتبر باشند. |
+| `PROD_SECRET_KEY` | رشته رندوم ۳۲ بایتی | کلید امضای Access Tokenهای JWT. |
+| `PROD_SECRET_REFRESH_KEY` | رشته رندوم ۳۲ بایتی | کلید امضای Refresh Tokenهای JWT. |
 
 ---
 
-## نکته مهم: VITE_API_BASE_URL
+## رفع کامل باگ‌ها و تضمین اجرای بی‌نقص
 
-> ⚠️ **این مهم‌ترین نکته برای prod است.**
+سه باگ اصلی که می‌توانستند مانع اجرای صحیح پروژه روی سرور شوند به‌طور اساسی رفع شدند:
 
-`VITE_API_BASE_URL` یک **Build-time argument** است، نه Runtime env var.  
-Vite این مقدار را **داخل JavaScript کامپایل‌شده** قرار می‌دهد. بعد از build ایمیج، دیگر قابل تغییر نیست.
+### ۱. حل مشکل کوکی‌های احراز هویت (Login و Refresh Token)
+- **مشکل قبلی:** متد `RefreshTokenHandler` دارای دامنه هاردکدشده `"localhost"` بود (`c.SetCookie(..., "localhost", ...)`). این موضوع باعث می‌شد در سرور و با دامنه `parva-ai.ir` مرورگر کوکی رفرش توکن را به کلی رد کند و با خطای `401 Unauthorized` کاربر از برنامه خارج شود.
+- **حل مشکل:** دامنه هاردکدشده حذف شد و کوکی به صورت Host-Only استاندارد تنظیم شد. همچنین امکان کنترل وضعیت `Secure` و `SameSite` از طریق متغیر محیطی `COOKIE_SECURE` اضافه شد تا بر روی پروتکل HTTP بدون باگ کار کند.
 
-**ایمیج فعلی روی Docker Hub:**
-```
-20071386/magic-stream-client:1.0.0
-VITE_API_BASE_URL = http://parva-ai.ir:8080  ✅
-```
+### ۲. حل مشکل تداخل پورت با سایت‌های موجود روی سرور
+- پورت کلاینت کاملاً پارامتریک از طریق `PROD_CLIENT_PORT` تنظیم می‌شود و شما می‌توانید هر پورت آزادی مثل ۳۰۰۰، ۸۰۸۱ یا ۹۰۰۰ را انتخاب کنید بدون اینکه نیازی به دست زدن به پورت ۸۰ یا ۴۴۳ سرور باشد.
 
-### اگر سرور یا دامنه تغییر کند
-
-```bash
-# روی ماشین local — دامنه جدید را جایگزین کن
-cd Client/magic-stream-client
-
-docker build \
-  -f Dockerfile.prod \
-  --build-arg VITE_API_BASE_URL=http://DOMAIN_JADID:8080 \
-  -t 20071386/magic-stream-client:1.0.0 .
-
-docker push 20071386/magic-stream-client:1.0.0
-
-# روی سرور — pull ایمیج جدید
-docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
-docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
-```
+### ۳. حل مشکل آدرس‌دهی و عدم نیاز به ری‌بیلد کلاینت
+- کانفیگ Nginx کلاینت به یک ریورس‌پروکسی داخلی برای مسیر `/api/` مجهز شد.
+- کلاینت اکنون به صورت داینامیک از آدرس نسبی `/api` استفاده می‌کند. در نتیجه:
+  - فرقی نمی‌کند کاربر با آی‌پی وارد شود یا با دامنه یا با چه پورتی، مرورگر همیشه به همان مبدأ درخواست می‌فرستد.
+  - هیچ مشکلی با CORS یا سیاست‌های بلاک کوکی بین پورت‌ها (Cross-Port) به وجود نمی‌آید.
+  - نیازی به ری‌بیلد مجدد ایمیج کلاینت با تغییر IP یا دامنه نخواهید داشت.
 
 ---
 
-## مدیریت تگ‌های Docker Hub
+## دستورات عیب‌یابی و مدیریت
 
-**تگ‌های فعلی روی Docker Hub:**
-- `20071386/magic-stream-api:1.0.0`
-- `20071386/magic-stream-client:1.0.0` ← آدرس `http://parva-ai.ir:8080`
-
-### انتشار نسخه جدید
-
+### مشاهده لاگ‌های کانتینر مشخص
 ```bash
-# ۱. build و push API
-cd Server/MagicStreamServer
-docker build -f Dockerfile.prod -t 20071386/magic-stream-api:1.1.0 .
-docker push 20071386/magic-stream-api:1.1.0
+# لاگ‌های بک‌اند Go
+docker compose --env-file .env.prod -f docker-compose.prod.yaml logs -f api
 
-# ۲. build و push Client
-cd ../../Client/magic-stream-client
-docker build -f Dockerfile.prod \
-  --build-arg VITE_API_BASE_URL=http://parva-ai.ir:8080 \
-  -t 20071386/magic-stream-client:1.1.0 .
-docker push 20071386/magic-stream-client:1.1.0
+# لاگ‌های فرانت‌اند Nginx
+docker compose --env-file .env.prod -f docker-compose.prod.yaml logs -f client
 
-# ۳. تگ‌ها را در docker-compose.prod.yaml آپدیت کن
-# ۴. روی سرور pull و restart کن
-docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
-docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
+# لاگ‌های دیتابیس مونگو
+docker compose --env-file .env.prod -f docker-compose.prod.yaml logs -f db
 ```
 
----
-
-## نکات امنیتی
-
-| وضعیت | موضوع |
-|--------|--------|
-| ✅ | `.env` و `.env.prod` در `.gitignore` |
-| ✅ | `.env` در `.dockerignore` هر سرویس |
-| ✅ | Secret‌های prod فقط Runtime، نه داخل ایمیج |
-| ✅ | API با user غیر‌root اجرا می‌شود |
-| ✅ | `GIN_MODE=release` در prod |
-| ⬜ | Firewall (UFW) روی سرور — توصیه می‌شود |
-| ⬜ | HTTPS با Nginx + Certbot — اگر دامنه SSL داری |
-
-### فعال کردن Firewall (Ubuntu)
-
-```bash
-sudo ufw allow ssh
-sudo ufw allow 80/tcp
-sudo ufw allow 8080/tcp
-sudo ufw enable
-sudo ufw status
-```
-
-### HTTPS رایگان (اختیاری — بعداً)
-
-اگر خواستی HTTPS اضافه کنی:
-```bash
-sudo apt install nginx certbot python3-certbot-nginx -y
-sudo certbot --nginx -d parva-ai.ir
-```
-
----
-
-## رفع اشکال
-
-### بررسی وضعیت کلی
-
-```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yaml ps
-docker compose --env-file .env.prod -f docker-compose.prod.yaml logs --tail=50
-```
-
-### لاگ یک سرویس خاص
-
-```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yaml logs api --tail=100
-docker compose --env-file .env.prod -f docker-compose.prod.yaml logs client --tail=50
-docker compose --env-file .env.prod -f docker-compose.prod.yaml logs db --tail=50
-```
-
-### restart یک سرویس
-
+### ری‌استارت مجدد یک سرویس
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yaml restart api
 ```
 
-### تست health endpoint
-
+### ریست کامل داده‌ها و شروع مجدد (در صورت نیاز به سید دوباره دیتابیس)
 ```bash
-curl http://localhost:8080/hello
-```
-
-### حذف کامل و شروع مجدد (خطرناک!)
-
-```bash
-# ⚠️ این Volume MongoDB را هم حذف می‌کند — داده‌ها از دست می‌روند
+# هشدار: اطلاعات دیتابیس حذف شده و از نو سید می‌شود
 docker compose --env-file .env.prod -f docker-compose.prod.yaml down -v
 docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
+```
+
+### باز کردن پورت فایروال سرور (در صورت بسته بودن پورت ۳۰۰۰)
+```bash
+# روی اوبونتو (UFW):
+sudo ufw allow 3000/tcp
+sudo ufw allow 8080/tcp
+sudo ufw reload
 ```
 
 ---
 
 ## لینک ویدیوی آموزشی
 
-- https://youtu.be/jBf7of9JTV8
+- [مشاهده ویدیو در یوتیوب](https://youtu.be/jBf7of9JTV8)

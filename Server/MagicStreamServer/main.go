@@ -32,20 +32,26 @@ func main() {
 
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 
-	var origins []string
-	if allowedOrigins != "" {
-		origins = strings.Split(allowedOrigins, ",")
-		for i := range origins {
-			origins[i] = strings.TrimSpace(origins[i])
-			log.Println("Allowed Origin:", origins[i])
-		}
-	} else {
-		origins = []string{"http://localhost:5173"}
-		log.Println("Allowed Origin: http://localhost:5173")
-	}
-
 	config := cors.Config{}
-	config.AllowOrigins = origins
+	if allowedOrigins == "*" {
+		config.AllowOriginFunc = func(origin string) bool {
+			return true
+		}
+		log.Println("Allowed Origin: * (dynamic reflection)")
+	} else {
+		var origins []string
+		if allowedOrigins != "" {
+			origins = strings.Split(allowedOrigins, ",")
+			for i := range origins {
+				origins[i] = strings.TrimSpace(origins[i])
+				log.Println("Allowed Origin:", origins[i])
+			}
+		} else {
+			origins = []string{"http://localhost:5173"}
+			log.Println("Allowed Origin: http://localhost:5173")
+		}
+		config.AllowOrigins = origins
+	}
 	config.AllowMethods = []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"}
 	//config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization"}
