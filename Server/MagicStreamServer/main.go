@@ -62,10 +62,25 @@ func main() {
 	router.Use(cors.New(config))
 	router.Use(gin.Logger())
 
-	var client *mongo.Client = database.Connect()
+	var client *mongo.Client
+	var pingErr error
+	for attempt := 1; attempt <= 10; attempt++ {
+		client = database.Connect()
+		if client != nil {
+			pingCtx, pingCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			pingErr = client.Ping(pingCtx, nil)
+			pingCancel()
+			if pingErr == nil {
+				log.Println("Connected to MongoDB successfully!")
+				break
+			}
+		}
+		log.Printf("MongoDB connection attempt %d/10 failed (%v), retrying in 2 seconds...\n", attempt, pingErr)
+		time.Sleep(2 * time.Second)
+	}
 
-	if err := client.Ping(context.Background(), nil); err != nil {
-		log.Fatalf("Failed to reach server: %v", err)
+	if pingErr != nil || client == nil {
+		log.Fatalf("Failed to reach MongoDB after 10 retries: %v", pingErr)
 	}
 	defer func() {
 		err := client.Disconnect(context.Background())

@@ -25,9 +25,9 @@ services:
     environment:
       MONGODB_URI: mongodb://db:27017
       DATABASE_NAME: magic-stream-movies
-      SECRET_KEY: ${PROD_SECRET_KEY:?Set PROD_SECRET_KEY in .env.prod}
-      SECRET_REFRESH_KEY: ${PROD_SECRET_REFRESH_KEY:?Set PROD_SECRET_REFRESH_KEY in .env.prod}
-      ALLOWED_ORIGINS: ${PROD_ALLOWED_ORIGINS:?Set PROD_ALLOWED_ORIGINS in .env.prod}
+      SECRET_KEY: ${PROD_SECRET_KEY:-magicstream-default-prod-secret-key-32chars}
+      SECRET_REFRESH_KEY: ${PROD_SECRET_REFRESH_KEY:-magicstream-default-prod-refresh-key-32chars}
+      ALLOWED_ORIGINS: ${PROD_ALLOWED_ORIGINS:-*}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       BASE_PROMPT_TEMPLATE: ${BASE_PROMPT_TEMPLATE:-}
       RECOMMENDED_MOVIE_LIMIT: ${RECOMMENDED_MOVIE_LIMIT:-5}
