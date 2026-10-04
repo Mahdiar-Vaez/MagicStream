@@ -281,6 +281,39 @@ sudo ufw reload
 
 ---
 
+## بیلد و پوش نسخه جدید به داکر هاب با --env-file
+
+به لطف هماهنگ‌سازی `docker-compose.prod.yaml`، شما برای بیلد و پوش نسخه‌های جدید نیازی به دستورات دستی `docker build` ندارید و همه چیز مستقیماً با فایل محیطی کنترل می‌شود:
+
+### ۱. تنظیم تگ نسخه در `.env.prod`
+روی سیستم لوکال خود، فایل `.env.prod` را باز کنید و تگ جدید را بنویسید:
+```ini
+IMAGE_TAG=1.1.0
+```
+
+### ۲. بیلد هر دو ایمیج با یک دستور
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yaml build
+```
+این دستور به طور خودکار:
+- مقدار `IMAGE_TAG` را از `.env.prod` می‌خواند.
+- ایمیج API را با تگ مشخص‌شده بیلد می‌کند.
+- ایمیج Client را با پروکسی داخلی `/api` بیلد می‌کند.
+
+### ۳. پوش هر دو ایمیج به داکر هاب با یک دستور
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yaml push
+```
+
+### ۴. به‌روزرسانی روی سرور
+روی سرور نیز فایل `.env.prod` را باز کنید و مقدار `IMAGE_TAG=1.1.0` را قرار دهید، سپس:
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
+docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d --remove-orphans
+```
+
+---
+
 ## لینک ویدیوی آموزشی
 
 - [مشاهده ویدیو در یوتیوب](https://youtu.be/jBf7of9JTV8)
