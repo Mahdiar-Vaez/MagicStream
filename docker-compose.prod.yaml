@@ -16,7 +16,7 @@ services:
       start_period: 10s
 
   api:
-    image: 20071386/magic-stream-api:1.0.0
+    image: 20071386/magic-stream-api:${IMAGE_TAG:-1.0.0}
     pull_policy: always
     restart: unless-stopped
     environment:
@@ -43,7 +43,7 @@ services:
       start_period: 20s
 
   client:
-    image: 20071386/magic-stream-client:1.0.0
+    image: 20071386/magic-stream-client:${IMAGE_TAG:-1.0.0}
     pull_policy: always
     restart: unless-stopped
     ports:
