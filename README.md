@@ -12,10 +12,10 @@
 - [پیش‌نیازها](#پیشنیازها)
 - [محیط توسعه (Dev)](#محیط-توسعه-dev)
 - [استقرار پروداکشن (Prod)](#استقرار-پروداکشن-prod)
-  - [نکته مهم: VITE_API_BASE_URL](#نکته-مهم-vite_api_base_url)
+  - [معماری سرور](#معماری-سرور)
   - [راهنمای گام‌به‌گام برای سرور](#راهنمای-گامبهگام-برای-سرور)
   - [راهنمای .env.prod](#راهنمای-envprod)
-- [بهترین روش دیپلوی](#بهترین-روش-دیپلوی)
+- [نکته مهم: VITE_API_BASE_URL](#نکته-مهم-vite_api_base_url)
 - [مدیریت تگ‌های Docker Hub](#مدیریت-تگهای-docker-hub)
 - [نکات امنیتی](#نکات-امنیتی)
 - [رفع اشکال](#رفع-اشکال)
@@ -91,9 +91,6 @@ MagicStream/
 git clone https://github.com/Mahdiar-Vaez/MagicStream.git
 cd MagicStream
 
-# فایل env توسعه وجود دارد — نیازی به تغییر ندارد (مقادیر پیش‌فرض کافی‌اند)
-# cat .env
-
 # اجرا با Hot-Reload (Docker Compose Watch)
 docker compose --env-file .env -f docker-compose.dev.yaml up --build --watch
 ```
@@ -113,212 +110,190 @@ docker compose --env-file .env -f docker-compose.dev.yaml up --build --watch
 
 ## استقرار پروداکشن (Prod)
 
-### نکته مهم: VITE_API_BASE_URL
+### معماری سرور
 
-> ⚠️ **این مهم‌ترین نکته برای prod است — بدون توجه به این، اپ کار نمی‌کند.**
-
-`VITE_API_BASE_URL` یک **Build-time argument** است، نه یک Runtime env var.  
-Vite این مقدار را **داخل JavaScript کامپایل‌شده** می‌گذارد. بعد از build ایمیج، دیگر قابل تغییر نیست.
-
-**این یعنی:**
-- اگر `20071386/magic-stream-client:1.0.0` را با آدرس `http://localhost:8080` build کرده‌ای، کلاینت همیشه به localhost وصل می‌شود — نه به سرور واقعی.
-- برای ست کردن آدرس درست، باید ایمیج را با `--build-arg` ری‌بیلد و push کنی.
-
-**چک کردن وضعیت فعلی ایمیج:**
-```bash
-# بررسی می‌کنیم VITE_API_BASE_URL چه مقداری دارد
-docker run --rm 20071386/magic-stream-client:1.0.0 \
-  sh -c "grep -r 'localhost:8080\|http://api' /usr/share/nginx/html --include='*.js' -l"
+```
+اینترنت
+   │
+   ├─── http://parva-ai.ir  (پورت 80)  ──► کانتینر client (Nginx)
+   │
+   └─── http://parva-ai.ir:8080        ──► کانتینر api (Go/gin)
+                                              │
+                                              └──► کانتینر db (MongoDB)
+                                                   [فقط داخل Docker network]
 ```
 
-اگر نام فایل‌هایی چاپ شد، URL داخل آن‌ها `localhost:8080` است و باید ری‌بیلد کنی:
-
-```bash
-# روی ماشین build (نه سرور) — دامنه API خود را بگذار
-cd Client/magic-stream-client
-
-docker build \
-  -f Dockerfile.prod \
-  --build-arg VITE_API_BASE_URL=http://YOUR_SERVER_IP:8080 \
-  -t 20071386/magic-stream-client:1.0.0 \
-  .
-
-docker push 20071386/magic-stream-client:1.0.0
-```
-
-> اگر دامنه داری (مثلاً api.magicstream.com)، IP را با دامنه جایگزین کن.
+> Docker images روی Docker Hub:
+> - `20071386/magic-stream-api:1.0.0`
+> - `20071386/magic-stream-client:1.0.0` ← build شده با `VITE_API_BASE_URL=http://parva-ai.ir:8080`
 
 ---
 
 ### راهنمای گام‌به‌گام برای سرور
 
-این دستورات را روی سرور لینوکسی اجرا کن:
-
 #### ۱. اتصال به سرور و نصب Docker
 
 ```bash
 # اتصال SSH
-ssh user@YOUR_SERVER_IP
+ssh root@156.241.0.153
 
 # نصب Docker (Ubuntu/Debian)
 curl -fsSL https://get.docker.com | sh
+
+# اگر کاربر غیر root داری
 sudo usermod -aG docker $USER
 newgrp docker
+
+# تست
+docker --version
+docker compose version
 ```
 
-#### ۲. کپی فایل‌های لازم به سرور
-
-فقط این فایل‌ها روی سرور لازم است — کد سورس نه، ایمیج‌ها از Docker Hub pull می‌شوند:
+#### ۲. ایجاد پوشه پروژه روی سرور
 
 ```bash
-# روی ماشین local — ایجاد پوشه روی سرور و کپی فایل‌ها
-ssh user@YOUR_SERVER_IP "mkdir -p ~/magicstream"
-
-scp docker-compose.prod.yaml user@YOUR_SERVER_IP:~/magicstream/
-scp .env.prod.example user@YOUR_SERVER_IP:~/magicstream/
-scp seed.js user@YOUR_SERVER_IP:~/magicstream/
-scp -r seed-data user@YOUR_SERVER_IP:~/magicstream/
+mkdir -p ~/magicstream
+cd ~/magicstream
 ```
 
-#### ۳. ساختن فایل .env.prod روی سرور
+#### ۳. کپی فایل‌های لازم به سرور
 
+فقط این ۴ چیز روی سرور لازم است — کد سورس نه، ایمیج‌ها از Docker Hub pull می‌شوند:
+
+**روش اول — با scp (از local):**
+```bash
+scp docker-compose.prod.yaml root@156.241.0.153:~/magicstream/
+scp .env.prod.example root@156.241.0.153:~/magicstream/
+scp seed.js root@156.241.0.153:~/magicstream/
+scp -r seed-data root@156.241.0.153:~/magicstream/
+```
+
+**روش دوم — با git clone (روی سرور):**
 ```bash
 # روی سرور
-cd ~/magicstream
-cp .env.prod.example .env.prod
-nano .env.prod   # یا vim .env.prod
+git clone https://github.com/Mahdiar-Vaez/MagicStream.git .
+# فقط فایل‌های لازم کپی شدند — seed-data هم هست
 ```
 
-#### ۴. اجرای پروداکشن
+#### ۴. ساختن فایل .env.prod روی سرور
 
 ```bash
-# روی سرور — از پوشه magicstream
+cd ~/magicstream
+cp .env.prod.example .env.prod
+nano .env.prod
+```
+
+محتوای `.env.prod` را این‌طور پر کن (فقط secret‌ها را تغییر بده):
+
+```ini
+PROD_CLIENT_PORT=80
+PROD_API_PORT=8080
+PROD_ALLOWED_ORIGINS=http://parva-ai.ir
+PROD_SECRET_KEY=اینجا-یک-کلید-بلند-تصادفی-بگذار
+PROD_SECRET_REFRESH_KEY=اینجا-یک-کلید-بلند-تصادفی-دیگر-بگذار
+OPENAI_API_KEY=
+BASE_PROMPT_TEMPLATE=
+RECOMMENDED_MOVIE_LIMIT=5
+```
+
+> **تولید secret key امن روی سرور:**
+> ```bash
+> openssl rand -hex 32
+> # دو بار اجرا کن — یکی برای SECRET_KEY، یکی برای SECRET_REFRESH_KEY
+> ```
+
+#### ۵. اجرای پروداکشن
+
+```bash
+# pull ایمیج‌ها از Docker Hub
 docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
+
+# اجرا در background
 docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d --remove-orphans
 ```
 
-#### ۵. بررسی وضعیت
+#### ۶. بررسی وضعیت
 
 ```bash
-# وضعیت کانتینرها
+# وضعیت کانتینرها (همه باید Up باشند)
 docker compose --env-file .env.prod -f docker-compose.prod.yaml ps
 
 # لاگ‌ها
 docker compose --env-file .env.prod -f docker-compose.prod.yaml logs -f
 
-# health check
-docker inspect --format='{{.State.Health.Status}}' magicstream-prod-api-1
+# تست API
+curl http://localhost:8080/hello
+
+# تست از بیرون
+curl http://parva-ai.ir:8080/hello
+curl http://parva-ai.ir
 ```
 
 ---
 
 ### راهنمای .env.prod
 
-فایل `.env.prod.example` را کپی کن و مقادیر زیر را پر کن:
+#### جدول متغیرها
 
-```ini
-# پورت‌های expose‌شده روی سرور (پورت host)
-PROD_CLIENT_PORT=80          # کلاینت روی این پورت در دسترس است
-PROD_API_PORT=8080           # API روی این پورت در دسترس است
+| متغیر | مقدار برای این سرور | توضیح |
+|--------|---------------------|-------|
+| `PROD_CLIENT_PORT` | `80` | پورت host برای کلاینت |
+| `PROD_API_PORT` | `8080` | پورت host برای API |
+| `PROD_ALLOWED_ORIGINS` | `http://parva-ai.ir` | CORS origin — دقیق همین |
+| `PROD_SECRET_KEY` | **باید تغییر کنی** | کلید JWT — حداقل ۳۲ کاراکتر |
+| `PROD_SECRET_REFRESH_KEY` | **باید تغییر کنی** | کلید JWT refresh — متفاوت از بالا |
+| `OPENAI_API_KEY` | اختیاری | اگر نداری خالی بگذار |
+| `BASE_PROMPT_TEMPLATE` | اختیاری | قالب سفارشی prompt |
+| `RECOMMENDED_MOVIE_LIMIT` | `5` | تعداد پیشنهاد AI |
 
-# Origin مجاز برای CORS
-# اگر کلاینت روی http://1.2.3.4 (بدون پورت) است:
-PROD_ALLOWED_ORIGINS=http://YOUR_SERVER_IP
-# اگر پورت غیر ۸۰ است:
-# PROD_ALLOWED_ORIGINS=http://YOUR_SERVER_IP:3000
-# اگر دامنه داری:
-# PROD_ALLOWED_ORIGINS=https://magicstream.example.com
+#### ❌ این متغیر در .env.prod نیست و تأثیری ندارد
 
-# کلیدهای JWT — باید طولانی و تصادفی باشند (حداقل ۳۲ کاراکتر)
-PROD_SECRET_KEY=replace-with-a-long-random-secret
-PROD_SECRET_REFRESH_KEY=replace-with-a-different-long-random-secret
+| متغیر | چرا اینجا نیست |
+|--------|----------------|
+| `VITE_API_BASE_URL` | Build-time است — داخل JS کامپایل شده. روی سرور قابل تغییر نیست |
 
-# OpenAI (اختیاری — اگر نداری خالی بگذار)
-OPENAI_API_KEY=
-BASE_PROMPT_TEMPLATE=
-RECOMMENDED_MOVIE_LIMIT=5
-```
+#### جدول خطاهای رایج
 
-> **تولید Secret Key امن:**
-> ```bash
-> # لینوکس/Mac
-> openssl rand -hex 32
-> # یا
-> python3 -c "import secrets; print(secrets.token_hex(32))"
-> ```
-
-#### جدول خطاهای رایج .env.prod
-
-| مشکل | علت | راه‌حل |
-|-------|------|---------|
-| API کار نمی‌کند | `PROD_SECRET_KEY` خالی یا کوتاه است | مقدار قوی وارد کن |
-| CORS error در مرورگر | `PROD_ALLOWED_ORIGINS` اشتباه است | IP یا دامنه دقیق فرانت‌اند را وارد کن |
-| کلاینت به API وصل نمی‌شود | `VITE_API_BASE_URL` اشتباه در ایمیج build شده | ایمیج کلاینت را ری‌بیلد کن (بالا توضیح داده شد) |
-| seed اجرا نمی‌شود | Volume از قبل وجود دارد | Volume را حذف کن: `docker volume rm magicstream-prod-mongodb-data` |
+| مشکل | علت احتمالی | راه‌حل |
+|-------|-------------|---------|
+| API کار نمی‌کند | `PROD_SECRET_KEY` کوتاه یا خالی | مقدار قوی وارد کن |
+| CORS error در مرورگر | `PROD_ALLOWED_ORIGINS` اشتباه | دقیقاً `http://parva-ai.ir` باشد |
+| کلاینت به API وصل نمی‌شود | ایمیج قدیمی با `localhost:8080` | ایمیج جدید از Docker Hub pull کن |
+| صفحه سفید / 404 | Nginx SPA routing مشکل | لاگ کانتینر client را چک کن |
+| seed اجرا نمی‌شود | Volume از قبل وجود دارد | این طبیعی است — seed فقط اول بار |
 
 ---
 
-## بهترین روش دیپلوی
+## نکته مهم: VITE_API_BASE_URL
 
-### گزینه ۱ — ساده‌ترین (بدون دامنه) ✅ توصیه برای شروع
+> ⚠️ **این مهم‌ترین نکته برای prod است.**
 
-اجرای مستقیم با Docker Compose روی IP سرور:
-- کلاینت: `http://SERVER_IP:80`
-- API: `http://SERVER_IP:8080`
+`VITE_API_BASE_URL` یک **Build-time argument** است، نه Runtime env var.  
+Vite این مقدار را **داخل JavaScript کامپایل‌شده** قرار می‌دهد. بعد از build ایمیج، دیگر قابل تغییر نیست.
+
+**ایمیج فعلی روی Docker Hub:**
+```
+20071386/magic-stream-client:1.0.0
+VITE_API_BASE_URL = http://parva-ai.ir:8080  ✅
+```
+
+### اگر سرور یا دامنه تغییر کند
 
 ```bash
+# روی ماشین local — دامنه جدید را جایگزین کن
+cd Client/magic-stream-client
+
+docker build \
+  -f Dockerfile.prod \
+  --build-arg VITE_API_BASE_URL=http://DOMAIN_JADID:8080 \
+  -t 20071386/magic-stream-client:1.0.0 .
+
+docker push 20071386/magic-stream-client:1.0.0
+
+# روی سرور — pull ایمیج جدید
+docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
 docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
 ```
-
----
-
-### گزینه ۲ — با Nginx Reverse Proxy (توصیه برای پروداکشن واقعی) ⭐
-
-نصب Nginx روی سرور و هدایت ترافیک:
-
-```
-Browser → Nginx (port 80/443) → Client container (port 80)
-                              → API container (port 8080)  [path /api]
-```
-
-**مزایا:**
-- HTTPS/TLS با Certbot رایگان
-- مخفی کردن پورت API (8080) از اینترنت
-- Rate limiting و security headers
-
-```nginx
-# /etc/nginx/sites-available/magicstream
-server {
-    listen 80;
-    server_name magicstream.example.com;
-
-    # Client
-    location / {
-        proxy_pass http://localhost:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # API
-    location /api/ {
-        proxy_pass http://localhost:8080/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-بعد از تنظیم Nginx، HTTPS رایگان بگیر:
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d magicstream.example.com
-```
-
----
-
-### گزینه ۳ — با Traefik (پیشرفته)
-
-اگر چند سرویس داری، Traefik به‌عنوان reverse proxy هوشمند داخل Docker Compose جالب است.
 
 ---
 
@@ -326,28 +301,25 @@ sudo certbot --nginx -d magicstream.example.com
 
 **تگ‌های فعلی روی Docker Hub:**
 - `20071386/magic-stream-api:1.0.0`
-- `20071386/magic-stream-client:1.0.0`
+- `20071386/magic-stream-client:1.0.0` ← آدرس `http://parva-ai.ir:8080`
 
 ### انتشار نسخه جدید
 
 ```bash
-# ۱. بیلد و push ایمیج API
+# ۱. build و push API
 cd Server/MagicStreamServer
 docker build -f Dockerfile.prod -t 20071386/magic-stream-api:1.1.0 .
 docker push 20071386/magic-stream-api:1.1.0
 
-# ۲. بیلد و push ایمیج Client (با آدرس API)
+# ۲. build و push Client
 cd ../../Client/magic-stream-client
 docker build -f Dockerfile.prod \
-  --build-arg VITE_API_BASE_URL=http://YOUR_SERVER_IP:8080 \
+  --build-arg VITE_API_BASE_URL=http://parva-ai.ir:8080 \
   -t 20071386/magic-stream-client:1.1.0 .
 docker push 20071386/magic-stream-client:1.1.0
 
-# ۳. تگ در docker-compose.prod.yaml را به‌روزرسانی کن
-# api: image: 20071386/magic-stream-api:1.1.0
-# client: image: 20071386/magic-stream-client:1.1.0
-
-# ۴. روی سرور آپدیت کن
+# ۳. تگ‌ها را در docker-compose.prod.yaml آپدیت کن
+# ۴. روی سرور pull و restart کن
 docker compose --env-file .env.prod -f docker-compose.prod.yaml pull
 docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
 ```
@@ -356,25 +328,32 @@ docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
 
 ## نکات امنیتی
 
-| ✅ انجام شده | ❌ انجام نشده |
-|-------------|--------------|
-| `.env` و `.env.prod` در `.gitignore` | — |
-| `.env` در `.dockerignore` هر سرویس | — |
-| Secret‌های prod فقط Runtime، نه داخل ایمیج | — |
-| API با user غیر‌root اجرا می‌شود | — |
-| GIN_MODE=release در prod | — |
-| HTTPS (نیاز به Nginx + Certbot) | ← اگر دامنه داری |
-| Firewall روی سرور (UFW) | ← توصیه می‌شود |
+| وضعیت | موضوع |
+|--------|--------|
+| ✅ | `.env` و `.env.prod` در `.gitignore` |
+| ✅ | `.env` در `.dockerignore` هر سرویس |
+| ✅ | Secret‌های prod فقط Runtime، نه داخل ایمیج |
+| ✅ | API با user غیر‌root اجرا می‌شود |
+| ✅ | `GIN_MODE=release` در prod |
+| ⬜ | Firewall (UFW) روی سرور — توصیه می‌شود |
+| ⬜ | HTTPS با Nginx + Certbot — اگر دامنه SSL داری |
 
 ### فعال کردن Firewall (Ubuntu)
 
 ```bash
 sudo ufw allow ssh
 sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-# پورت 8080 را فقط اگر مستقیم expose می‌کنی باز کن
 sudo ufw allow 8080/tcp
 sudo ufw enable
+sudo ufw status
+```
+
+### HTTPS رایگان (اختیاری — بعداً)
+
+اگر خواستی HTTPS اضافه کنی:
+```bash
+sudo apt install nginx certbot python3-certbot-nginx -y
+sudo certbot --nginx -d parva-ai.ir
 ```
 
 ---
@@ -388,55 +367,33 @@ docker compose --env-file .env.prod -f docker-compose.prod.yaml ps
 docker compose --env-file .env.prod -f docker-compose.prod.yaml logs --tail=50
 ```
 
-### کانتینر restart می‌شود (Restart Loop)
+### لاگ یک سرویس خاص
 
 ```bash
-docker logs magicstream-prod-api-1 --tail=100
+docker compose --env-file .env.prod -f docker-compose.prod.yaml logs api --tail=100
+docker compose --env-file .env.prod -f docker-compose.prod.yaml logs client --tail=50
+docker compose --env-file .env.prod -f docker-compose.prod.yaml logs db --tail=50
 ```
 
-### بررسی config نهایی (بدون افشای secret)
+### restart یک سرویس
 
 ```bash
-# این خروجی را share نکن — شامل secret‌هاست
-docker compose --env-file .env.prod -f docker-compose.prod.yaml config
-```
-
-### حذف کامل و شروع مجدد
-
-```bash
-# ⚠️ این Volume MongoDB را هم حذف می‌کند — داده‌ها از دست می‌روند
-docker compose --env-file .env.prod -f docker-compose.prod.yaml down -v
-docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
+docker compose --env-file .env.prod -f docker-compose.prod.yaml restart api
 ```
 
 ### تست health endpoint
 
 ```bash
 curl http://localhost:8080/hello
-# باید 200 برگرداند
 ```
 
----
+### حذف کامل و شروع مجدد (خطرناک!)
 
-## نکات مهم درباره فایل‌های محیطی
-
-### .env (توسعه)
-- **در Git نیست** (`.gitignore`)
-- مقادیر پیش‌فرض dev دارد
-- Compose این فایل را برای جایگزینی `${VARIABLE}` در YAML می‌خواند
-
-### .env.prod (پروداکشن)  
-- **هرگز commit نکن**
-- **هرگز در Docker Hub push نکن**
-- فقط روی سرور وجود دارد
-- از `.env.prod.example` ساخته می‌شود
-
-### VITE_API_BASE_URL — خاص است
-- **Build-time** است، نه runtime
-- Vite آن را داخل JS کامپایل می‌کند
-- بعد از `docker build`، دیگر قابل تغییر نیست
-- در `.env.prod` روی سرور **تأثیری ندارد**
-- باید موقع `docker build` با `--build-arg` ست شود
+```bash
+# ⚠️ این Volume MongoDB را هم حذف می‌کند — داده‌ها از دست می‌روند
+docker compose --env-file .env.prod -f docker-compose.prod.yaml down -v
+docker compose --env-file .env.prod -f docker-compose.prod.yaml up -d
+```
 
 ---
 
